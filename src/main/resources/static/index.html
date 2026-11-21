@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Personal Finance & Expense Tracker</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 720px; margin: 30px auto; padding: 0 16px; background: #f4f6f9; color: #222; }
+    h1 { margin-bottom: 20px; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+    .card { background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    .card span { font-size: 13px; color: #666; display: block; }
+    .card strong { font-size: 20px; margin-top: 6px; display: block; }
+    form { background: #fff; padding: 16px; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    input, select, button { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 14px; }
+    button { background: #2563eb; color: #fff; border: none; cursor: pointer; grid-column: span 2; font-weight: bold; }
+    button:hover { background: #1d4ed8; }
+    table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+    th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; }
+    .income { color: #16a34a; font-weight: bold; }
+    .expense { color: #dc2626; font-weight: bold; }
+    .del-btn { background: #ef4444; color: #fff; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Personal Finance & Expense Tracker</h1>
+
+  <div class="cards">
+    <div class="card"><span>Balance</span><strong id="balance">₹0.00</strong></div>
+    <div class="card"><span>Income</span><strong id="income" class="income">₹0.00</strong></div>
+    <div class="card"><span>Expenses</span><strong id="expense" class="expense">₹0.00</strong></div>
+  </div>
+
+  <form id="txForm">
+    <input type="text" id="title" placeholder="Title (e.g., Salary, Groceries)" required />
+    <input type="number" id="amount" step="0.01" placeholder="Amount" required />
+    <select id="type">
+      <option value="EXPENSE">Expense</option>
+      <option value="INCOME">Income</option>
+    </select>
+    <input type="text" id="category" placeholder="Category (e.g., Food, Bills)" required />
+    <button type="submit">Add Transaction</button>
+  </form>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Category</th>
+        <th>Type</th>
+        <th>Amount</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="txList"></tbody>
+  </table>
+
+  <script>
+    async function loadDashboard() {
+      const [sumRes, listRes] = await Promise.all([
+        fetch('/api/summary'),
+        fetch('/api/transactions')
+      ]);
+      const sum = await sumRes.json();
+      const items = await listRes.json();
+
+      document.getElementById('balance').textContent = `₹${Number(sum.balance || 0).toFixed(2)}`;
+      document.getElementById('income').textContent = `₹${Number(sum.income || 0).toFixed(2)}`;
+      document.getElementById('expense').textContent = `₹${Number(sum.expense || 0).toFixed(2)}`;
+
+      const tbody = document.getElementById('txList');
+      tbody.innerHTML = items.map(t => `
+        <tr>
+          <td>${t.title}</td>
+          <td>${t.category}</td>
+          <td class="${t.type === 'INCOME' ? 'income' : 'expense'}">${t.type}</td>
+          <td>₹${Number(t.amount).toFixed(2)}</td>
+          <td><button class="del-btn" onclick="deleteTx(${t.id})">Delete</button></td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('txForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        title: document.getElementById('title').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        type: document.getElementById('type').value,
+        category: document.getElementById('category').value
+      };
+      await fetch('/api/transactions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      e.target.reset();
+      loadDashboard();
+    });
+
+    async function deleteTx(id) {
+      await fetch(`/api/transactions/${id}`, { method: 'DELETE' });
+      loadDashboard();
+    }
+
+    loadDashboard();
+  </script>
+</body>
+</html>
